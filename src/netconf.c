@@ -334,6 +334,8 @@ np2srv_rpc_copyconfig_cb(const struct lyd_node *rpc, struct np_user_sess *user_s
         ds = SR_DS_STARTUP;
     } else if (!strcmp(nodeset->dnodes[0]->schema->name, "candidate")) {
         ds = SR_DS_CANDIDATE;
+    } else if (!strcmp(nodeset->dnodes[0]->schema->name, "factory")) {
+        ds = SR_DS_FACTORY_DEFAULT; /* only allowed as copy-from */
     } else {
         assert(!strcmp(nodeset->dnodes[0]->schema->name, "url"));
 #ifdef NP2SRV_URL_CAPAB
