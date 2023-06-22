@@ -357,6 +357,8 @@ np2srv_rpc_copyconfig_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), con
         ds = SR_DS_STARTUP;
     } else if (!strcmp(nodeset->dnodes[0]->schema->name, "candidate")) {
         ds = SR_DS_CANDIDATE;
+    } else if (!strcmp(nodeset->dnodes[0]->schema->name, "factory")) {
+        ds = SR_DS_FACTORY_DEFAULT; /* only allowed as copy-from */
     } else {
         assert(!strcmp(nodeset->dnodes[0]->schema->name, "url"));
 #ifdef NP2SRV_URL_CAPAB
