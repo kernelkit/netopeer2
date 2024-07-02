@@ -81,9 +81,6 @@ CONFIG="<netconf-server xmlns=\"urn:ietf:params:xml:ns:yang:ietf-netconf-server\
                                 </public-key>
                             </host-key>
                         </server-identity>
-                        <client-authentication>
-                            ${USERS_CONFIG}
-                        </client-authentication>
                     </ssh-server-parameters>
                 </ssh>
             </endpoint>
