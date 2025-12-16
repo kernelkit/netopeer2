@@ -86,7 +86,7 @@ set(YANG_MODULE_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/yang/modul
 set(DATA_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/netopeer2" CACHE STRING "Directory with shared netopeer2 data")
 
 # script options
-option(SYSREPO_SETUP "Install required modules with their default configuration into sysrepo using a script" ON)
+option(SYSREPO_SETUP "Install required modules with their default configuration into sysrepo using a script" OFF)
 set(MODULES_PERMS 600 CACHE STRING "File access permissions set for all the server modules")
 if(NOT MODULES_OWNER)
     execute_process(COMMAND id -un RESULT_VARIABLE RET
