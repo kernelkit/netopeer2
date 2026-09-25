@@ -498,11 +498,16 @@ np2srv_check_schemas(sr_session_ctx_t *sr_sess)
     mod_name = "ietf-yang-library";
     NP2_CHECK_MODULE(mod_name);
 
-    /* .. ietf-netconf-server */
+    /* .. ietf-netconf-server, not needed when only listening on a UNIX socket (-U PATH) */
     mod_name = "ietf-netconf-server";
-    NP2_CHECK_MODULE(mod_name);
-    NP2_CHECK_FEATURE("ssh-listen");
-    NP2_CHECK_FEATURE("ssh-call-home");
+    mod = ly_ctx_get_module_implemented(ly_ctx, mod_name);
+    if (mod) {
+        NP2_CHECK_FEATURE("ssh-listen");
+        NP2_CHECK_FEATURE("ssh-call-home");
+    } else if (!np2srv.unix_socket) {
+        ERR("Module \"%s\" not implemented in sysrepo.", mod_name);
+        return -1;
+    }
 
     sr_session_release_context(sr_sess);
     return 0;
@@ -833,6 +838,12 @@ server_init(void)
 
     /* init libnetconf2 */
     if (nc_server_init()) {
+        goto error;
+    }
+
+    /* the socket is world-writable, NACM is the access control */
+    if (np2srv.unix_socket && nc_server_add_unix_endpt("unix", np2srv.unix_socket, 0666)) {
+        ERR("Listening on UNIX socket \"%s\" failed.", np2srv.unix_socket);
         goto error;
     }
 
@@ -1255,8 +1266,15 @@ server_data_subscribe(void)
     /* create keys and certs subscriptions before server configuration, which may already reference them */
     SR_CONFIG_SUBSCR("ietf-keystore", NULL, np2srv_libnetconf2_config_cb);
     SR_CONFIG_SUBSCR("ietf-truststore", NULL, np2srv_libnetconf2_config_cb);
-    SR_CONFIG_SUBSCR("ietf-netconf-server", NULL, np2srv_libnetconf2_config_cb);
-    SR_CONFIG_SUBSCR("libnetconf2-netconf-server", NULL, np2srv_libnetconf2_config_cb);
+
+    /* ietf-netconf-server is optional when only listening on a UNIX socket (-U PATH) */
+    ly_ctx = sr_acquire_context(np2srv.sr_conn);
+    mod = ly_ctx_get_module_implemented(ly_ctx, "ietf-netconf-server");
+    sr_release_context(np2srv.sr_conn);
+    if (mod) {
+        SR_CONFIG_SUBSCR("ietf-netconf-server", NULL, np2srv_libnetconf2_config_cb);
+        SR_CONFIG_SUBSCR("libnetconf2-netconf-server", NULL, np2srv_libnetconf2_config_cb);
+    }
 
     /*
      * ietf-netconf-acm
@@ -1406,6 +1424,8 @@ print_usage(char *progname)
     fprintf(stdout, "            supporting some extensions such as schema-mount, in which case the ietf-yang-schema-mount\n");
     fprintf(stdout, "            operational data are expected to be in the file.\n");
     fprintf(stdout, " -U ENDPT:PATH Set UNIX socket path for a specific endpoint.\n");
+    fprintf(stdout, " -U PATH    Listen on a UNIX socket without any ietf-netconf-server configuration,\n");
+    fprintf(stdout, "            e.g. behind an sshd \"Subsystem netconf\" running netconf-subsystem.\n");
     fprintf(stdout, " -v LEVEL   Verbose output level:\n");
     fprintf(stdout, "                0 - errors\n");
     fprintf(stdout, "                1 - errors and warnings\n");
@@ -1532,11 +1552,15 @@ main(int argc, char *argv[])
             np2srv.ext_data_path = optarg;
             break;
         case 'U':
-            /* parse endpoint_name:unix_socket_path */
+            /* a bare path is an endpoint of its own, created after nc_server_init() */
             ptr = strchr(optarg, ':');
             if (!ptr) {
-                ERR("Invalid format for -U parameter \"%s\". Expected format: <endpoint_name>:<unix_socket_path>", optarg);
-                return EXIT_FAILURE;
+                if (optarg[0] != '/') {
+                    ERR("Invalid -U parameter \"%s\". Expected an absolute path or <endpoint_name>:<unix_socket_path>", optarg);
+                    return EXIT_FAILURE;
+                }
+                np2srv.unix_socket = optarg;
+                break;
             }
 
             /* terminate the endpoint name string */
