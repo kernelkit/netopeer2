@@ -72,6 +72,8 @@ ncm_is_monitored(struct nc_session *session)
     case NC_TI_TLS:
         return 1;
 #endif
+    case NC_TI_UNIX:
+        return 1;
     default:
         break;
     }
@@ -276,6 +278,7 @@ np2srv_ncm_oper_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const cha
     struct ly_ctx *ly_ctx;
     char **cpblts;
     char *time_str, buf[11];
+    const char *host;
     uint32_t i;
     LYA_COUNT_T u;
     struct timespec ts;
@@ -347,6 +350,7 @@ np2srv_ncm_oper_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const cha
             sprintf(buf, "%" PRIu32, nc_session_get_id(stats.sessions[i]));
             lyd_new_list(cont, NULL, "session", 0, &list, buf);
 
+            host = nc_session_get_host(stats.sessions[i]);
             switch (nc_session_get_ti(stats.sessions[i])) {
 #ifdef NC_ENABLED_SSH_TLS
             case NC_TI_SSH:
@@ -356,13 +360,21 @@ np2srv_ncm_oper_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const cha
                 lyd_new_term(list, NULL, "transport", "netconf-tls", 0, NULL);
                 break;
 #endif
+            case NC_TI_UNIX:
+                /* UNIX sessions come from an SSH daemon running netconf-subsystem,
+                 * their host is the socket path, not a valid inet:host */
+                lyd_new_term(list, NULL, "transport", "netconf-ssh", 0, NULL);
+                host = NULL;
+                break;
             default: /* NC_TI_FD, NC_TI_NONE */
                 ERR("ietf-netconf-monitoring unsupported session transport type.");
                 pthread_mutex_unlock(&stats.lock);
                 goto error;
             }
             lyd_new_term(list, NULL, "username", nc_session_get_username(stats.sessions[i]), 0, NULL);
-            lyd_new_term(list, NULL, "source-host", nc_session_get_host(stats.sessions[i]), 0, NULL);
+            if (host) {
+                lyd_new_term(list, NULL, "source-host", host, 0, NULL);
+            }
             ts = nc_session_get_start_time(stats.sessions[i]);
             ly_time_ts2str(&ts, &time_str);
             lyd_new_term(list, NULL, "login-time", time_str, 0, NULL);

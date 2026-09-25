@@ -78,6 +78,7 @@ struct np2srv {
 
     const char *server_dir;         /**< path to server files (just confirmed commit for the moment) */
     char *url_protocols;           /**< list of supported URL protocols */
+    const char *unix_socket;        /**< UNIX socket to listen on without any ietf-netconf-server config (-U PATH) */
 
     struct nc_pollsession *nc_ps;   /**< libnetconf2 pollsession structure */
     pthread_t workers[NP2SRV_THREAD_COUNT]; /**< worker threads handling sessions */
